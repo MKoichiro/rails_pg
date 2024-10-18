@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: $POSTGRES_USER
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.dev
+      args:
+        - GROUP_NAME=$GROUP_NAME
+        - GID=$GID
+        - USER_NAME=$USER_NAME
+        - UID=$UID
+    ports:
+      - "3000:3000"
+    user: "$UID:$GID"
+    volumes:
+      - ./api:/home/$USER_NAME/api
+    # 単一コンテナに複数バージョンの rails を導入することは基本的に bundle exec は基本的に要らない
+    # が、イレギュラーに強い環境構築を心がけて、bundle exec をつけておく
+    command: bash -c "rm -f tmp/pids/server.pid && bundle exec rails s -p 3000 -b '0.0.0.0'"
+    tty: true
+    stdin_open: true
+    environment:
+      POSTGRES_HOST: $POSTGRES_HOST
+      POSTGRES_USER: $POSTGRES_USER
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+    depends_on:
+      - db
+volumes:
+  db-data:

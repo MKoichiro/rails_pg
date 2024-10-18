@@ -1,0 +1,19 @@
+FROM ruby
+
+RUN apt-get update -qq && apt-get install -y postgresql-client
+
+ARG USER_NAME
+ARG GROUP_NAME
+ARG UID
+ARG GID
+RUN groupadd -o -g $GID $GROUP_NAME && \
+    useradd -o -m -s /bin/bash -u $UID -g $GID $USER_NAME
+
+WORKDIR /home/$USER_NAME/api
+COPY Gemfile* .
+RUN bundle install
+
+COPY entrypoint.sh .
+ENTRYPOINT [ "./entrypoint.sh" ]
+
+CMD ["/bin/rails", "s", "-p", "3000", "-b", "0.0.0.0"]
