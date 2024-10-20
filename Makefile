@@ -37,7 +37,11 @@ print-vars:
 
 # Set the Docker compose context to the current directory
 docker_context:
-	@curl 
+	@curl -L -o rails_pg.zip https://github.com/MKoichiro/rails_pg/archive/refs/heads/main.zip
+	@unzip -o rails_pg.zip
+	@rm rails_pg.zip
+	@mv rails_pg-main/* .
+	@rm -r rails_pg-main/ rails_pg.zip
 
 # Create .env file
 .env: ./create_env.sh
