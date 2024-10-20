@@ -38,10 +38,14 @@ print-vars:
 # Set the Docker compose context to the current directory
 docker_context:
 	@curl -L -o rails_pg.zip https://github.com/MKoichiro/rails_pg/archive/refs/heads/main.zip
-	@unzip -o rails_pg.zip
-	@rm rails_pg.zip
+	@unzip -o -qq rails_pg.zip && rm $_
 	@mv rails_pg-main/* .
-	@rm -r rails_pg-main/ rails_pg.zip
+	@rm -rf rails_pg-main/
+	@echo "Open with Visual Studio Code? (yes/no): "
+	@read answer; \
+		if echo "$$answer" | grep -Eq '^(?:Y(?:E[Ss]|e[Ss])?|y(?:E[Ss]|e[Ss])?)$$'; then \
+		code .; \
+	fi
 
 # Create .env file
 .env: ./create_env.sh
