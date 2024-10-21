@@ -21,23 +21,15 @@ DB_CONTAINER = db
 DB_HOST = $(POSTGRES_HOST)
 DB_USER = $(POSTGRES_USER)
 DB_NAME = api_$(ENVIRONMENT)
-DB_SETTINGS = "  host: <%%= ENV['POSTGRES_HOST'] %%>\n  username: <%%= ENV['POSTGRES_USER'] %%>\n  password: <%%= ENV['POSTGRES_PASSWORD'] %%>\n"
 
+# database.yml に挿入する内容
+DB_SETTINGS = "  host: <%%= ENV['POSTGRES_HOST'] %%>\n  username: <%%= ENV['POSTGRES_USER'] %%>\n  password: <%%= ENV['POSTGRES_PASSWORD'] %%>\n"
 # Gemfileの初期内容
 GEMFILE_CONTENT = source \"https://rubygems.org\"\n\ngem \"rails\", \"~> 7.2.1\"\n
-
 # cleanコマンドで削除しないファイルのリスト
 EXCLUDE_PATTERNS := 'Gemfile*' 'Dockerfile*' '.dockerignore' 'entrypoint.sh'
 
-# For debugging
-print-vars:
-	@echo "DBMS: $(DBMS)"
-	@echo "DB_USER: $(DB_USER)"
-	@echo "DB_NAME: $(DB_NAME)"
-	@echo "ENV: $(ENV)"
-	@echo "ENVIRONMENT: $(ENVIRONMENT)"
-
-# Set the Docker compose context to the current directory
+# Set up the current directory as the Docker Compose context.
 docker_context:
 	@curl -L -o rails_pg.zip https://github.com/MKoichiro/rails_pg/archive/refs/heads/main.zip
 	@unzip -o -qq rails_pg.zip && rm $_
@@ -52,36 +44,36 @@ docker_context:
 			exit 0; \
 		fi
 
-# Create .env file
+# Create a `.env` file.
 .env: ./create_env.sh
 	./create_env.sh
 
-# Run rails new command
+# Run `rails new` in an ephemeral api container.
 new:
 	$(COMPOSE_CMD) $(COMPOSE_FILE_FLAG) run --rm --no-deps $(API_CONTAINER) rails new . --force --skip-bundle --database=$(DBMS)ql --api
 
-# database.ymlの設定を変更
+# Edit `database.yml` to configure PostgreSQL.
 database.yml:
 	@printf $(DB_SETTINGS) \
 	| sed -i '/^  encoding: unicode$$/r /dev/stdin' ./api/config/database.yml
 
-# Create empty database
+# Create an empty database.
 db:
 	$(COMPOSE_CMD) $(COMPOSE_FILE_FLAG) run --rm $(API_CONTAINER) rails db:create
 
-# Build the containers
+# Build the images.
 build:
 	$(COMPOSE_CMD) $(COMPOSE_FILE_FLAG) build
 
-# Open a bash session in the api container
+# Open a bash session in the api container.
 bash:
 	$(COMPOSE_CMD) $(COMPOSE_FILE_FLAG) run --rm $(API_CONTAINER) bash
 
-# Access the PostgreSQL shell in the db container
+# Access the PostgreSQL shell in the db container.
 db_shell:
 	$(COMPOSE_CMD) $(COMPOSE_FILE_FLAG) run --rm $(DB_CONTAINER) psql -h $(DB_HOST) -U $(DB_USER) -d $(DB_NAME)
 
-# Start up the services
+# Start up the services.
 up:
 	$(COMPOSE_CMD) $(COMPOSE_FILE_FLAG) up
 
@@ -89,25 +81,24 @@ up:
 down:
 	$(COMPOSE_CMD) down --rmi all
 
-# Clean up
+# Delete all files except those related to Docker and `db-data` volume.
 clean: down
+	$(COMPOSE_CMD) down --volumes
 	@printf "[!] All files except those related to Docker will be deleted.\nAre you sure you want to continue? (y/n): "
 	@read confirm; \
 	if [ -z "$$confirm" ] || echo "$$confirm" | grep -Eq '^(Y|y|YES|yes|Yes|YEs|YeS|yEs|yeS)$$'; then \
-			echo "delete the following directories and all their subdirectories and files."; \
-			find ./api/ -mindepth 1 -maxdepth 1 -type d -print; \
-			find ./api/ -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +; \
-
-			echo -e "\ndelete the following files."; \
-			find ./api/ -type f ! \( $(foreach names, $(EXCLUDE_PATTERNS), -name $(names) -o) -false \) -print; \
-			find ./api/ -type f ! \( $(foreach names, $(EXCLUDE_PATTERNS), -name $(names) -o) -false \) -delete; \
-
-			echo -e "\nclear Gemfile and Gemfile.lock"; \
-			: > ./api/Gemfile.lock; \
-			echo "$(GEMFILE_CONTENT)" > ./api/Gemfile; \
+		echo "delete the following directories and all their subdirectories and files."; \
+		find ./api/ -mindepth 1 -maxdepth 1 -type d -print; \
+		find ./api/ -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +; \
+		echo -e "\ndelete the following files."; \
+		find ./api/ -type f ! \( $(foreach names, $(EXCLUDE_PATTERNS), -name $(names) -o) -false \) -print; \
+		find ./api/ -type f ! \( $(foreach names, $(EXCLUDE_PATTERNS), -name $(names) -o) -false \) -delete; \
+		echo -e "\nclear Gemfile and Gemfile.lock"; \
+		: > ./api/Gemfile.lock; \
+		echo "$(GEMFILE_CONTENT)" > ./api/Gemfile; \
 	else \
-			echo "Canceled."; \
-			exit 0; \
+		echo "Canceled."; \
+		exit 0; \
 	fi
 
 # Show help
@@ -116,7 +107,6 @@ help:
 	@grep -hE '^- [a-zA-Z_\.-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 	awk 'BEGIN {FS = ":.*?## "}; {printf "%-20s %s\n", $$1, $$2}' | \
 	sort
-
 
 SEED_TEMPLATE =\
 User.create(name: 'John Doe', email: 'john@example.com')\n\
@@ -143,7 +133,7 @@ Rails.application.routes.draw do\n\
 \tend\n\
 end\n
 
-# Make test api project
+# Create a User model and controller, and set up routing.
 test_project: db
 	$(COMPOSE_CMD) $(COMPOSE_FILE_FLAG) run --rm $(API_CONTAINER) rails g model User name:string email:string
 	@echo "Generate User model."
@@ -162,18 +152,17 @@ test_project: db
 	@echo "...Complete."
 	@echo "Please run 'make up' to start the services. Then, access 'http://localhost:3000/api/v1/users' in your browser."
 
-
 # Mark the targets with comments for help display
-- docker_context:	## : Set the Docker compose context to the current directory. Curl from git repository.
-- .env:          	## : Create .env file
-- new:           	## : Run rails new command
-- database.yml:  	## : Change the database.yml settings
-- db:            	## : Create empty database
-- build:         	## : Build the images
-- bash:          	## : Open a bash session in the api container
-- db_shell:      	## : Access the PostgreSQL shell in the db container
-- up:            	## : Start up the services
-- down:          	## : Shut down and remove images
-- clean:         	## : Delete all files except those related to Docker
-- test_project:  	## : Make test api project
-- help:          	## : Show help
+- docker_context:	## : Set up the current directory as the Docker Compose context.
+- .env:          	## : Create a `.env` file.
+- new:           	## : Run `rails new` in an ephemeral api container.
+- database.yml:  	## : Edit `database.yml` to configure PostgreSQL.
+- db:            	## : Create an empty database.
+- build:         	## : Build the images.
+- bash:          	## : Open a bash session in the api container.
+- db_shell:      	## : Access the PostgreSQL shell in the db container.
+- up:            	## : Start up the services.
+- down:          	## : Shut down and remove images.
+- clean:         	## : Delete all files except those related to Docker and `db-data` volume.
+- test_project:  	## : Create a User model and controller, and set up routing.
+- help:          	## : Show help.
