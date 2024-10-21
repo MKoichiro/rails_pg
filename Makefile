@@ -40,10 +40,17 @@ print-vars:
 # Set the Docker compose context to the current directory
 docker_context:
 	@curl -L -o rails_pg.zip https://github.com/MKoichiro/rails_pg/archive/refs/heads/main.zip
-	@unzip -o rails_pg.zip
-	@rm rails_pg.zip
+	@unzip -o -qq rails_pg.zip && rm $_
 	@mv rails_pg-main/* .
-	@rm -r rails_pg-main/ rails_pg.zip
+	@rm -rf rails_pg-main/
+	@echo "Open with Visual Studio Code? (yes/no): "
+	@read answer; \
+		if echo "$$answer" | grep -Eq '^(Y|y|YES|yes|Yes|YEs|YeS|yEs|yeS)$$'; then \
+			code .; \
+		else \
+			echo "Canceled."; \
+			exit 0; \
+		fi
 
 # Create .env file
 .env: ./create_env.sh
@@ -86,19 +93,22 @@ down:
 clean: down
 	@printf "[!] All files except those related to Docker will be deleted.\nAre you sure you want to continue? (y/n): "
 	@read confirm; \
-		if [ "$$confirm" != "y" ]; then \
-		echo "Aborted."; \
-		exit 0; \
+	if [ -z "$$confirm" ] || echo "$$confirm" | grep -Eq '^(Y|y|YES|yes|Yes|YEs|YeS|yEs|yeS)$$'; then \
+			echo "delete the following directories and all their subdirectories and files."; \
+			find ./api/ -mindepth 1 -maxdepth 1 -type d -print; \
+			find ./api/ -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +; \
+
+			echo -e "\ndelete the following files."; \
+			find ./api/ -type f ! \( $(foreach names, $(EXCLUDE_PATTERNS), -name $(names) -o) -false \) -print; \
+			find ./api/ -type f ! \( $(foreach names, $(EXCLUDE_PATTERNS), -name $(names) -o) -false \) -delete; \
+
+			echo -e "\nclear Gemfile and Gemfile.lock"; \
+			: > ./api/Gemfile.lock; \
+			echo "$(GEMFILE_CONTENT)" > ./api/Gemfile; \
+	else \
+			echo "Canceled."; \
+			exit 0; \
 	fi
-	@find ./api/ -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
-	@#find ./api/ -type f ! \( -name 'Gemfile*' -o -name 'Dockerfile*' -o -name '.dockerignore' -o -name 'entrypoint.sh' \) -delete
-	@find ./api/ -type f ! \( $(foreach names, $(EXCLUDE_PATTERNS), -name $(names) -o) -false \) -print
-	@: > ./api/Gemfile.lock
-	@echo "$(GEMFILE_CONTENT)" > ./api/Gemfile
-	@echo "deleted the following directories and all their subdirectories and files."
-	@find ./api/ -mindepth 1 -maxdepth 1 -type d -print
-	@echo -e "\ndeleted the following files."
-	@find ./api/ -type f ! \( -name 'Gemfile*' -o -name 'Dockerfile*' -o -name '.dockerignore' -o -name 'entrypoint.sh' \) -print
 
 # Show help
 help:
