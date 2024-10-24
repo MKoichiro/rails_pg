@@ -30,9 +30,9 @@ GEMFILE_CONTENT = source \"https://rubygems.org\"\n\ngem \"rails\", \"~> 7.2.1\"
 EXCLUDE_PATTERNS := 'Gemfile*' 'Dockerfile*' '.dockerignore' 'entrypoint.sh'
 
 # Set up the current directory as the Docker Compose context.
-docker_context:
+dc_context:
 	@curl -L -o rails_pg.zip https://github.com/MKoichiro/rails_pg/archive/refs/heads/main.zip
-	@unzip -o -qq rails_pg.zip && rm $_
+	@unzip -o -qq rails_pg.zip && rm rails_pg.zip
 	@mv rails_pg-main/* .
 	@rm -rf rails_pg-main/
 	@echo "Open with Visual Studio Code? (yes/no): "
@@ -153,7 +153,7 @@ test_project: db
 	@echo "Please run 'make up' to start the services. Then, access 'http://localhost:3000/api/v1/users' in your browser."
 
 # Mark the targets with comments for help display
-- docker_context:	## : Set up the current directory as the Docker Compose context.
+- dc_context:	    ## : Set up the current directory as the Docker Compose context.
 - .env:          	## : Create a `.env` file.
 - new:           	## : Run `rails new` in an ephemeral api container.
 - database.yml:  	## : Edit `database.yml` to configure PostgreSQL.
