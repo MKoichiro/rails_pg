@@ -9,12 +9,14 @@ sudo apt install curl unzip
 Then download a Makefile to your workspace:
 ```bash
 cd path/to/your/working/directory/
+```
+```bash
 curl -O https://raw.githubusercontent.com/MKoichiro/rails_pg/main/Makefile
 ```
 
 Next, execute the following command to set up the current directory as the Docker Compose context:
 ```bash
-make docker_context
+make dc_context
 ```
 
 You can check the available `make` commands by running:
