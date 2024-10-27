@@ -1,0 +1,120 @@
+# Make sure RUBY_VERSION matches the Ruby version in .ruby-version
+ARG RUBY_VERSION=3.3.5
+
+ARG USER_NAME
+ARG GROUP_NAME
+ARG UID
+ARG GID
+
+# --- Common base stage for development and production ---
+  # Specify the base image by full name to make sure it from Docker Hub
+FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base-common
+
+# Install packages needed common to each environment
+  # libjemalloc2 is a memory allocator that can be used to reduce memory fragmentation
+  # libvips is an image processing library
+RUN apt-get update -qq && \
+    apt-get install \
+      --no-install-recommends -y \
+      curl \
+      postgresql-client \
+      libjemalloc2 \
+      libvips
+
+# Set common environment
+ENV BUNDLE_PATH="/usr/local/bundle"
+
+# --- Base stage for development ---
+FROM base-common AS base-development
+
+# Rails app lives here
+WORKDIR /home/$USER_NAME/api
+
+# Install packages needed for development
+RUN apt-get update -qq \
+    && \
+    apt-get install \
+      --no-install-recommends -y \
+      build-essential \
+      git \
+      libpq-dev \
+      pkg-config
+
+# --- Build stage for development ---
+# FROM base-development AS build-development
+# Nothing to do here, just a placeholder for now
+
+# --- Final stage for development ---
+FROM base-development AS development
+
+# Run and own only the runtime files as a non-root user for security
+RUN groupadd --non-unique --gid $GID $GROUP_NAME && \
+    useradd $USER_NAME --uid $UID --gid $GID --non-unique --create-home --shell /bin/bash
+
+# Install application gems
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+
+COPY entrypoint.sh .
+ENTRYPOINT [ "./entrypoint.sh" ]
+
+CMD ["./bin/rails", "server", "--port", "3000", "--binding", "0.0.0.0"]
+
+ARG USER_NAME_PROD="rails"
+ARG GROUP_NAME_PROD="rails"
+
+# --- Base stage for production ---
+FROM base-common AS base-production
+
+# Set production environment
+ENV RAILS_ENV="production" \
+    BUNDLE_DEPLOYMENT="1" \
+    BUNDLE_WITHOUT="development"
+
+# --- Build stage for production ---
+FROM base-production AS build-production
+
+# Rails app lives here
+WORKDIR /home/$USER_NAME_PROD/api
+
+# Install packages needed to build gems
+RUN apt-get update -qq \
+    && \
+    apt-get install \
+      --no-install-recommends -y \
+      build-essential \
+      git \
+      libpq-dev \
+      pkg-config \
+    && \
+    rm -rf /var/lib/apt/lists /var/cache/apt/archives
+
+# Install application gems
+COPY Gemfile Gemfile.lock ./
+RUN bundle install && \
+    rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git && \
+    bundle exec bootsnap precompile --gemfile
+
+# Copy application code
+COPY . .
+
+# Precompile bootsnap code for faster boot times
+RUN bundle exec bootsnap precompile app/ lib/
+
+# --- Final stage for production ---
+FROM base-production AS production
+
+# Copy built artifacts: gems, application
+COPY --from=build-production "${BUNDLE_PATH}" "${BUNDLE_PATH}"
+COPY --from=build-production . .
+
+# Run and own only the runtime files as a non-root user for security
+RUN groupadd --system --gid $GID $GROUP_NAME_PROD && \
+    useradd $USER_NAME_PROD --uid $UID --gid $GID --create-home --shell /bin/bash
+
+# Entrypoint prepares the database.
+ENTRYPOINT ["/api/bin/docker-entrypoint"]
+
+# Start the server by default, this can be overwritten at runtime
+EXPOSE 3000
+CMD ["./bin/rails", "server"]
