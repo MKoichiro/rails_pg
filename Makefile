@@ -1,33 +1,35 @@
-# .envファイルの環境変数を読み込む
-ifneq (,$(wildcard ./.env))
-	include .env
-	export
-endif
+.PHONY:
 
-ENV ?= dev
-ENVIRONMENT = development
+# .envファイルの環境変数をMake変数として読み込む
+include .env
+
+ENV?=dev
+ENVIRONMENT=development
 ifeq ($(ENV), prod)
-ENVIRONMENT = production
+ENVIRONMENT=production
 else ifeq ($(ENV), test)
-ENVIRONMENT = $(ENV)
+ENVIRONMENT=$(ENV)
 else ifneq ($(ENV), dev)
 $(error ERROR: Unkown value for ENV: "$(ENV)". Only 'dev' or 'prod' or 'test' are allowed)
 endif
-COMPOSE_FILE = compose.yaml
-COMPOSE_FILE_FLAG = -f $(COMPOSE_FILE)
-COMPOSE_CMD = docker compose
-API_CONTAINER = api
-DB_CONTAINER = db
-DB_HOST = $(POSTGRES_HOST)
-DB_USER = $(POSTGRES_USER)
-DB_NAME = api_$(ENVIRONMENT)
+COMPOSE_FILE=compose.yaml
+COMPOSE_FILE_FLAG=-f $(COMPOSE_FILE)
+COMPOSE_CMD=docker compose
+API_CONTAINER=api
+DB_CONTAINER=db
+DB_HOST=$(POSTGRES_HOST)
+DB_USER=$(POSTGRES_USER)
+DB_NAME=api_$(ENVIRONMENT)
 
 # database.yml に挿入する内容
-DB_SETTINGS = "  host: <%%= ENV['POSTGRES_HOST'] %%>\n  username: <%%= ENV['POSTGRES_USER'] %%>\n  password: <%%= ENV['POSTGRES_PASSWORD'] %%>\n"
+DB_SETTINGS="  host: <%%= ENV['POSTGRES_HOST'] %%>\n  username: <%%= ENV['POSTGRES_USER'] %%>\n  password: <%%= ENV['POSTGRES_PASSWORD'] %%>\n"
 # Gemfileの初期内容
-GEMFILE_CONTENT = source \"https://rubygems.org\"\n\ngem \"rails\", \"~> 7.2.1\"\n
+GEMFILE_CONTENT="source \"https://rubygems.org\"\n\ngem \"rails\", \"~> 7.2.1\"\n"
 # cleanコマンドで削除しないファイルのリスト
-EXCLUDE_PATTERNS := 'Gemfile*' 'Dockerfile*' '.dockerignore' 'entrypoint.sh'
+EXCLUDE_PATTERNS:='Gemfile*' 'Dockerfile*' '.dockerignore' 'docker-entrypoint.dev'
+
+test:
+	@echo $(DBMS)
 
 # Set up the current directory as the Docker Compose context.
 dc_context:
@@ -45,12 +47,12 @@ dc_context:
 		fi
 
 # Create a `.env` file.
-.env: ./create_env.sh
+env:
 	./create_env.sh
 
 # Run `rails new` in an ephemeral api container.
 new:
-	$(COMPOSE_CMD) $(COMPOSE_FILE_FLAG) run --rm --no-deps $(API_CONTAINER) rails new . --force --skip-bundle --database=$(DBMS)ql --api
+	$(COMPOSE_CMD) $(COMPOSE_FILE_FLAG) run --rm --no-deps $(API_CONTAINER) bundle exec rails new . --force --skip-bundle --database=$(DBMS)ql --api
 
 # Edit `database.yml` to configure PostgreSQL.
 database.yml:
@@ -81,23 +83,27 @@ up:
 down:
 	$(COMPOSE_CMD) down --rmi all
 
+BACKUP_DIR=./api/backup_$(shell date +%Y%m%d%H%M%S)
 # Delete all files except those related to Docker and `db-data` volume.
 clean: down
-	$(COMPOSE_CMD) down --volumes
 	@printf "[!] All files except those related to Docker will be deleted.\nAre you sure you want to continue? (y/n): "
 	@read confirm; \
 	if [ -z "$$confirm" ] || echo "$$confirm" | grep -Eq '^(Y|y|YES|yes|Yes|YEs|YeS|yEs|yeS)$$'; then \
-		echo "delete the following directories and all their subdirectories and files."; \
-		find ./api/ -mindepth 1 -maxdepth 1 -type d -print; \
-		find ./api/ -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +; \
-		echo -e "\ndelete the following files."; \
-		find ./api/ -type f ! \( $(foreach names, $(EXCLUDE_PATTERNS), -name $(names) -o) -false \) -print; \
-		find ./api/ -type f ! \( $(foreach names, $(EXCLUDE_PATTERNS), -name $(names) -o) -false \) -delete; \
-		echo -e "\nclear Gemfile and Gemfile.lock"; \
+		mkdir $(BACKUP_DIR); \
+		printf "\n* Keep the following files.\n"; \
+		find ./api/ -type f \( $(foreach names, $(EXCLUDE_PATTERNS), -name $(names) -o) -false \) -print; \
+		find ./api/ -type f \( $(foreach names, $(EXCLUDE_PATTERNS), -name $(names) -o) -false \) -exec mv {} $(BACKUP_DIR) 2>/dev/null \;; \
+		printf "\n* Delete the following directories and their subdirectories and files.\n"; \
+		find ./api/ -mindepth 1 -maxdepth 1 -type d ! -path $(BACKUP_DIR) -print -exec rm -rf {} +; \
+		printf "\n* Delete the following files.\n"; \
+		find ./api/ -maxdepth 1 -type f -print -delete; \
+		find $(BACKUP_DIR) -type f ! -name docker-entrypoint.dev -exec mv {} ./api/ \;; \
+		mv -T $(BACKUP_DIR) ./api/bin; \
+		printf "\n* Clear Gemfile and Gemfile.lock\n"; \
 		: > ./api/Gemfile.lock; \
-		echo "$(GEMFILE_CONTENT)" > ./api/Gemfile; \
+		printf $(GEMFILE_CONTENT) > ./api/Gemfile; \
 	else \
-		echo "Canceled."; \
+		echo Canceled.; \
 		exit 0; \
 	fi
 
@@ -154,7 +160,7 @@ test_project: db
 
 # Mark the targets with comments for help display
 - dc_context:	    ## : Set up the current directory as the Docker Compose context.
-- .env:          	## : Create a `.env` file.
+- env:          	## : Create a `.env` file.
 - new:           	## : Run `rails new` in an ephemeral api container.
 - database.yml:  	## : Edit `database.yml` to configure PostgreSQL.
 - db:            	## : Create an empty database.
