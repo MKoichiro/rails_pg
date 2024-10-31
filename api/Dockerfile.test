@@ -2,15 +2,15 @@
 ARG RUBY_VERSION=3.3.5
 
 # --- Common base stage for development and production ---
-  # Specify the base image by full name to make sure it from Docker Hub
+# Specify the base image by full name to make sure it from Docker Hub
 FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base-common
 
 ARG UID \
     GID
 
 # Install packages needed common to each environment
-  # libjemalloc2 is a memory allocator that can be used to reduce memory fragmentation
-  # libvips is an image processing library
+# - libjemalloc2 is a memory allocator that can be used to reduce memory fragmentation
+# - libvips is an image processing library
 RUN apt-get update -qq && \
     apt-get install \
       --no-install-recommends -y \
@@ -19,10 +19,6 @@ RUN apt-get update -qq && \
       libjemalloc2 \
       libvips
 
-# Set common environment
-# ENV BUNDLE_PATH="/usr/local/bundle"
-# ENV BUNDLE_BIN="/usr/local/bundle/bin"
-# ENV PATH="${BUNDLE_BIN}:${PATH}"
 
 # --- Base stage for development ---
 FROM base-common AS base-development
