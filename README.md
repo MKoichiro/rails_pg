@@ -54,10 +54,14 @@ This will insert `host`, `username` and `password`  into `default` section of da
 make db
 ```
 This will execute `rails db:create` in an ephemeral api container.
+Now, completed basic settings.
+Run `git init` and make first commit.
+You can developing your own api project,
+or proceed next step to try to launch a project prepared for operation check.
 
 <details>
   <summary>
-    You can skip final step and develop your own application code.
+    Generate test_project
   </summary>
 
   6. Create a User model and controller, and set up routing:
@@ -67,6 +71,21 @@ This will execute `rails db:create` in an ephemeral api container.
   This will generate a User model and controller, and set up the necessary routes.
 
   Finally, run `make up`(or `docker compose up` for instead) to start the services. Then, access http://localhost:3000/api/v1/users in your browser to see the users JSON response.
+
+  7. Step back to the state after step 5
+  If proceeded to 6, files that may be unnecessary for your own project will be created.
+  To delete all files except essentials for docker compose context, run:
+  ```bash
+  make clean
+  ```
+  This process will contain `docker compose down --rmi all`.
+  And run commands introduced 2 ~ 5 steps again:
+  ```bash
+  make new
+  make build
+  make database.yml
+  make db
+  ```
 </details>
 
 

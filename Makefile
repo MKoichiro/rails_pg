@@ -1,7 +1,9 @@
 .PHONY:
 
 # .envファイルの環境変数をMake変数として読み込む
+ifneq (,$(wildcard .env))
 include .env
+endif
 
 ENV?=dev
 ENVIRONMENT=development
@@ -27,9 +29,6 @@ DB_SETTINGS="  host: <%%= ENV['POSTGRES_HOST'] %%>\n  username: <%%= ENV['POSTGR
 GEMFILE_CONTENT="source \"https://rubygems.org\"\n\ngem \"rails\", \"~> 7.2.1\"\n"
 # cleanコマンドで削除しないファイルのリスト
 EXCLUDE_PATTERNS:='Gemfile*' 'Dockerfile*' '.dockerignore' 'docker-entrypoint.dev'
-
-test:
-	@echo $(DBMS)
 
 # Set up the current directory as the Docker Compose context.
 dc_context:

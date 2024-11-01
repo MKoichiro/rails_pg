@@ -9,7 +9,8 @@ services:
   api:
     build:
       context: ./api
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile.test
+      target: development
       args:
         - GROUP_NAME=$GROUP_NAME
         - GID=$GID
