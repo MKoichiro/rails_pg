@@ -36,13 +36,14 @@ dc_context:
 	@unzip -o -qq rails_pg.zip && rm rails_pg.zip
 	@mv rails_pg-main/* .
 	@rm -rf rails_pg-main/
-	@echo "Open with Visual Studio Code? (yes/no): "
+	@echo "Open with Visual Studio Code? (yes/no/cursor): "
 	@read answer; \
 		if echo "$$answer" | grep -Eq '^(Y|y|YES|yes|Yes|YEs|YeS|yEs|yeS)$$'; then \
 			code .; \
+		elsif echo "$$answer" | grep -e '^cursor$$'; then \
+			cursor .; \
 		else \
 			echo "Canceled."; \
-			exit 0; \
 		fi
 
 # Create a `.env` file.
