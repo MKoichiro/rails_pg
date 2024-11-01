@@ -40,7 +40,7 @@ dc_context:
 	@read answer; \
 		if echo "$$answer" | grep -Eq '^(Y|y|YES|yes|Yes|YEs|YeS|yEs|yeS)$$'; then \
 			code .; \
-		elsif echo "$$answer" | grep -e '^cursor$$'; then \
+		elif echo "$$answer" | grep -e '^cursor$$'; then \
 			cursor .; \
 		else \
 			echo "Canceled."; \
